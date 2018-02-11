@@ -5,7 +5,7 @@ namespace RobbieP\ZbarQrdecoder;
 use RobbieP\ZbarQrdecoder\Result\ErrorResult;
 use RobbieP\ZbarQrdecoder\Result\Result;
 use Symfony\Component\Process\Exception\ProcessFailedException;
-use Symfony\Component\Process\ProcessBuilder;
+use Symfony\Component\Process\Process;
 
 class ZbarDecoder {
 
@@ -14,10 +14,7 @@ class ZbarDecoder {
     private $path;
     private $file_path;
     private $result;
-    /**
-     * @var ProcessBuilder
-     */
-    private $processBuilder;
+
     /**
      * @var array
      */
@@ -25,7 +22,7 @@ class ZbarDecoder {
 
     /**
      * @param array $config
-     * @param ProcessBuilder $processBuilder
+     * @param Process $processBuilder
      */
     function __construct($config = [], $processBuilder = null)
     {
@@ -33,7 +30,6 @@ class ZbarDecoder {
         if(isset($this->config['path'])) {
             $this->setPath($this->config['path']);
         }
-        $this->processBuilder =  is_null($processBuilder) ? new ProcessBuilder() : $processBuilder;
     }
 
     /**
@@ -45,8 +41,15 @@ class ZbarDecoder {
     public function make($filename)
     {
         $this->setFilepath($filename);
-        $this->buildProcess();
-        $this->runProcess();
+
+		$process = new Process([
+			$this->getPath() . DIRECTORY_SEPARATOR . static::EXECUTABLE,
+			'-D', '--xml', '-q', $this->getFilepath()
+		]);
+
+		$process->enableOutput();
+		$this->runProcess($process);
+
         return $this->output();
     }
 
@@ -93,24 +96,14 @@ class ZbarDecoder {
     }
 
     /**
-     * Builds the process
-     * TODO: Configurable arguments
-     * @throws \Exception
-     */
-    private function buildProcess()
-    {
-        $path = $this->getPath();
-        $this->processBuilder->setPrefix($path . DIRECTORY_SEPARATOR . static::EXECUTABLE);
-        $this->processBuilder->setArguments(array('-D', '--xml', '-q', $this->getFilepath()))->enableOutput();
-    }
-
-    /**
      * Runs the process
+	 *
+	 * @param Process $process
+	 *
      * @throws \Exception
      */
-    private function runProcess()
+    private function runProcess(Process $process)
     {
-        $process = $this->processBuilder->getProcess();
         try {
             $process->mustRun();
             $this->result = new Result($process->getOutput());
